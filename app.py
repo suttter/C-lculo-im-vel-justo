@@ -1,13 +1,17 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import urllib.parse
 
 st.set_page_config(page_title="Simulador Imobiliário Bauru", layout="wide")
 
 st.title("🏆 Simulador Imobiliário Master - Bauru")
-st.markdown("Altere os dados no painel abaixo para ver o resultado e o gráfico mudarem em tempo real no seu celular.")
+st.markdown("Altere os dados no painel abaixo para ver o resultado, impostos e o gráfico mudarem em tempo real no seu celular.")
 
 # --- 📱 PAINEL INTERATIVO DE ENTRADA DE DADOS ---
+st.subheader("📍 Identificação do Imóvel")
+nome_imovel = st.text_input("Nome do Condomínio, Prédio ou Rua do Imóvel", value="Apartamento Térreo - Bauru")
+
 st.subheader("💰 Seu Capital Inicial")
 dinheiro_total_guardado = st.number_input("Capital total que você tem guardado hoje (R$)", value=250000, step=5000)
 
@@ -15,7 +19,7 @@ st.subheader("🏡 Condições de Compra do Imóvel")
 col_compra1, col_compra2 = st.columns(2)
 with col_compra1:
     v_imovel_anuncio = st.number_input("Valor de anúncio do imóvel (R$)", value=250000, step=5000)
-    desconto_a_vista = st.slider("Desconto negociado à vista (%)", 0.0, 20.0, 8.0, 0.5)
+    desconto_a_vista = st.number_input("Desconto negociado à vista (%)", value=8.0, step=0.5, min_value=0.0, max_value=100.0)
 with col_compra2:
     v_condominio_inicial = st.number_input("Taxa de Condomínio mensal (R$)", value=420, step=10)
     valor_venal_exato = st.number_input("Valor Venal para cálculo de IPTU (R$)", value=130000, step=5000)
@@ -24,28 +28,42 @@ st.subheader("📈 Condições de Aluguel")
 v_aluguel_mensal_inicial = st.number_input("Aluguel mensal inicial sugerido (R$)", value=1000, step=50)
 
 st.subheader("🔮 Cenário Econômico do Brasil")
+# 🚀 NOVO: Botão de atalho prático para preencher a economia atual de agosto/2026
+if st.button("📊 Preencher Automaticamente com os Dados de Hoje (Agosto/2026)"):
+    st.session_state.taxa_selic_slider = 14.00
+    st.session_state.cdi_slider = 105.0
+
+# Inicialização de estados caso o botão não seja clicado
+if 'taxa_selic_slider' not in st.session_state: st.session_state.taxa_selic_slider = 14.00
+if 'cdi_slider' not in st.session_state: st.session_state.cdi_slider = 105.0
+
 col_eco1, col_eco2 = st.columns(2)
 with col_eco1:
     periodo_simulacao_meses = st.slider("Prazo de análise da simulação (Meses)", 1, 120, 60, 1)
     tendencia_da_selic = st.selectbox("Tendência futura da Taxa Selic", ["Queda Gradual", "Alta Gradual", "Estável"])
 with col_eco2:
-    taxa_selic_hoje = st.slider("Taxa Selic atual do país (% a.a.)", 2.0, 20.0, 14.0, 0.25) / 100
-    cdi_performance = st.slider("Rentabilidade da sua Renda Fixa (% do CDI)", 90.0, 120.0, 105.0, 1.0) / 100
+    taxa_selic_hoje = st.slider("Taxa Selic atual do país (% a.a.)", 2.0, 20.0, st.session_state.taxa_selic_slider, 0.25, key="selic_real") / 100
+    cdi_performance = st.slider("Rentabilidade da sua Renda Fixa (% do CDI)", 90.0, 120.0, st.session_state.cdi_slider, 1.0, key="cdi_real") / 100
 
 val_imovel_ano = 0.06 # Média padrão de Bauru
 inflacao_ano = 0.04   # Meta padrão de inflação
 
 # --- 🧮 PROCESSAMENTO MATEMÁTICO CONTÍNUO ---
 v_imovel_venda = v_imovel_anuncio * (1 - (desconto_a_vista / 100))
-v_iptu_mes_inicial = (valor_venal_exato * 0.01) / 12
-total_custos_atrito = (v_imovel_venda * 0.02) + (v_imovel_venda * 0.018)
-remanente_entrada_compra = v_imovel_venda + total_custos_atrito
+
+custo_itbi = v_imovel_venda * 0.02  
+custo_escritura_registro = v_imovel_venda * 0.018  
+v_iptu_ano = valor_venal_exato * 0.01  
+v_iptu_mes_inicial = v_iptu_ano / 12
+
+total_taxas_compra = custo_itbi + custo_escritura_registro
+custo_total_para_adquirir = v_imovel_venda + total_taxas_compra
 
 val_mensal_imovel = (1 + val_imovel_ano)**(1/12) - 1
 inflacao_mensal = (1 + inflacao_ano)**(1/12) - 1
 
 dados = []
-saldo_banco_pos_compra = dinheiro_total_guardado - remanente_entrada_compra
+saldo_banco_pos_compra = dinheiro_total_guardado - custo_total_para_adquirir
 imovel_fisico = v_imovel_venda
 saldo_banco_alugar = dinheiro_total_guardado
 
@@ -87,7 +105,24 @@ df = pd.DataFrame(dados)
 patr_final_comprar = dados[-1]["COMPRAR"]
 patr_final_alugar = dados[-1]["ALUGAR"]
 
-# --- 🖥️ EXIBIÇÃO EM TEMPO REAL ---
+# --- 🖥️ EXIBIÇÃO DO EXTRATO DE TAXAS OCULTAS ---
+st.markdown("---")
+st.subheader("📋 Extrato de Gastos Reais da Compra (Bauru):")
+
+ext_col1, ext_col2, ext_col3 = st.columns(3)
+with ext_col1:
+    st.metric("💵 Preço com Desconto", f"R$ {v_imovel_venda:,.2f}")
+with ext_col2:
+    st.metric("🏛️ Imposto ITBI (2%)", f"R$ {custo_itbi:,.2f}")
+with ext_col3:
+    st.metric("✍️ Cartórios (Est.)", f"R$ {custo_escritura_registro:,.2f}")
+
+if saldo_banco_pos_compra < 0:
+    st.error(f"⚠️ ALERTA DE CAPITAL: Seu saldo de R$ {dinheiro_total_guardado:,.2f} não cobre as taxas! Faltam R$ {abs(saldo_banco_pos_compra):,.2f}.")
+else:
+    st.success(f"✅ SALDO SUFICIENTE: Sobrarão R$ {saldo_banco_pos_compra:,.2f} de reserva de emergência.")
+
+# --- 📊 EXIBIÇÃO DO VEREDITO PATRIMONIAL ---
 st.markdown("---")
 st.subheader("📊 Patrimônio Acumulado no Final do Prazo:")
 res_col1, res_col2 = st.columns(2)
@@ -96,18 +131,65 @@ with res_col1:
 with res_col2:
     st.metric("📈 Cenário Alugar e Investir", f"R$ {patr_final_alugar:,.2f}")
 
+veredit_text = ""
 if patr_final_comprar > patr_final_alugar:
-    st.success(f"🌟 VEREDITO FINANCEIRO: **COMPRAR** é melhor por R$ {patr_final_comprar - patr_final_alugar:,.2f}!")
+    veredit_text = f"COMPRAR o imóvel físico é matematicamente mais vantajoso por uma diferença de R$ {patr_final_comprar - patr_final_alugar:,.2f}."
+    st.success(f"🌟 VEREDITO FINANCEIRO: {veredit_text}")
 else:
-    st.info(f"🌟 VEREDITO FINANCEIRO: **ALUGAR E INVESTIR** é melhor por R$ {patr_final_alugar - patr_final_comprar:,.2f}!")
+    veredit_text = f"ALUGAR E INVESTIR o capital é matematicamente mais vantajoso por uma diferença de R$ {patr_final_alugar - patr_final_comprar:,.2f}."
+    st.info(f"🌟 VEREDITO FINANCEIRO: {veredit_text}")
 
 # --- 📈 GRÁFICO INTERATIVO ---
+plt.close('all')
 fig, ax = plt.subplots(figsize=(10, 4))
-ax.plot(df["Mês"], df["COMPRAR"], label="Se Comprar (Imóvel + Sobras)", color="green", linewidth=2.5)
-ax.plot(df["Mês"], df["ALUGAR"], label="Se Alugar (Dinheiro no Banco)", color="blue", linewidth=2.5)
-ax.set_xlabel("Meses de Simulação")
+ax.plot(df["Mês"], df["COMPRAR"], label="Se Comprar", color="green", linewidth=2.5)
+ax.plot(df["Mês"], df["ALUGAR"], label="Se Alugar", color="blue", linewidth=2.5)
+ax.set_xlabel("Meses")
 ax.set_ylabel("Patrimônio Líquido (R$)")
 ax.grid(True, linestyle="--", alpha=0.5)
 ax.legend()
 ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: format(int(x), ',')))
 st.pyplot(fig)
+
+# --- 📝 ESTRUTURAÇÃO DO TEXTO DO PARECER PAR COMPARTILHAR ---
+texto_relatorio = f"""📊 PARECER TÉCNICO IMOBILIÁRIO - {nome_imovel.upper()}
+
+Análise de Cenários Financeiros para o prazo de {periodo_simulacao_meses} meses.
+
+1️⃣ DADOS DA COMPRA:
+- Imóvel Identificado: {nome_imovel}
+- Preço Comercial do Imóvel: R$ {v_imovel_anuncio:,.2f}
+- Desconto Aplicado à Vista: {desconto_a_vista:.2f}%
+- Preço Final de Venda: R$ {v_imovel_venda:,.2f}
+- Imposto ITBI (2%): R$ {custo_itbi:,.2f}
+- Custos Cartorários (Escritura/Registro): R$ {custo_escritura_registro:,.2f}
+👉 Custo Total para Aquisição à Vista: R$ {custo_total_para_adquirir:,.2f}
+
+2️⃣ DADOS DO ALUGUEL ALTERNATIVO:
+- Custo de Aluguel Inicial: R$ {v_aluguel_mensal_inicial:,.2f}/mês
+- Custos de Condomínio + IPTU: R$ {v_condominio_inicial + iptu_vigente:,.2f}/mês
+
+3️⃣ PROJEÇÃO PATRIMONIAL APÓS {periodo_simulacao_meses} MESES:
+- Patrimônio Acumulado se COMPRAR: R$ {patr_final_comprar:,.2f}
+- Patrimônio Acumulado se ALUGAR: R$ {patr_final_alugar:,.2f}
+
+🏆 VEREDITO FINAL:
+{veredit_text}
+
+Gerado via Simulador Imobiliário Master."""
+
+st.markdown("---")
+st.subheader("📲 Compartilhar Análise")
+st.text_area("Pré-visualização do texto:", texto_relatorio, height=200)
+
+texto_codificado = urllib.parse.quote(texto_relatorio)
+link_whatsapp = f"https://whatsapp.com{texto_codificado}"
+
+assunto_email = urllib.parse.quote(f"Análise Imobiliária - {nome_imovel}")
+link_email = f"mailto:?subject={assunto_email}&body={texto_codificado}"
+
+share_col1, share_col2 = st.columns(2)
+with share_col1:
+    st.markdown(f'<a href="{link_whatsapp}" target="_blank" style="text-decoration:none;"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer;">🟢 Compartilhar via WhatsApp</button></a>', unsafe_escape_html=True)
+with share_col2:
+    st.markdown(f'<a href="{link_email}" style="text-decoration:none;"><button style="width:100%; background-color:#EA4335; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer;">🔴 Compartilhar via E-mail</button></a>', unsafe_escape_html=True)
