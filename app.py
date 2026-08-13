@@ -8,13 +8,12 @@ st.set_page_config(page_title="Simulador Imobiliário Bauru", layout="wide")
 st.title("🏆 Simulador Imobiliário Master - Bauru")
 st.markdown("Altere os dados no painel abaixo para ver o resultado, impostos e o gráfico mudarem em tempo real no seu celular.")
 
-# --- 🚀 GERENCIAMENTO DE ESTADO PARA OS CAMPOS (TRAVA DE CHAVE) ---
+# --- 🚀 GERENCIAMENTO DE ESTADO PARA OS CAMPOS ---
 if "selic_val" not in st.session_state:
     st.session_state.selic_val = 14.00
 if "cdi_val" not in st.session_state:
     st.session_state.cdi_val = 105.0
 
-# Função executada ao clicar no botão para atualizar a memória do app
 def preencher_dados_hoje():
     st.session_state.selic_val = 14.00
     st.session_state.cdi_val = 105.0
@@ -39,8 +38,6 @@ st.subheader("📈 Condições de Aluguel")
 v_aluguel_mensal_inicial = st.number_input("Aluguel mensal inicial sugerido (R$)", value=1000, step=50)
 
 st.subheader("🔮 Cenário Econômico do Brasil")
-
-# Botão prático que limpa os campos e injeta os dados reais de 2026
 st.button("📊 Preencher Automaticamente com os Dados de Hoje (Agosto/2026)", on_click=preencher_dados_hoje)
 
 col_eco1, col_eco2 = st.columns(2)
@@ -48,16 +45,14 @@ with col_eco1:
     periodo_simulacao_meses = st.slider("Prazo de análise da simulação (Meses)", 1, 120, 60, 1)
     tendencia_da_selic = st.selectbox("Tendência futura da Taxa Selic", ["Queda Gradual", "Alta Gradual", "Estável"])
 with col_eco2:
-    # 🎯 CORREÇÃO: Vinculação direta do valor com a chave de memória (key) do session_state
     taxa_selic_hoje = st.number_input("Taxa Selic atual do país (% ao ano)", step=0.25, key="selic_val") / 100
     cdi_performance = st.number_input("Rentabilidade da sua Renda Fixa (% do CDI)", step=1.0, key="cdi_val") / 100
 
 val_imovel_ano = 0.06 
 inflacao_ano = 0.04   
 
-# --- 🧮 PROCESSAMENTO MATEMÁTICO CONTÍNUO ---
+# --- 🧮 PROCESSAMENTO MATEMÁTICO ---
 v_imovel_venda = v_imovel_anuncio * (1 - (desconto_a_vista / 100))
-
 custo_itbi = v_imovel_venda * 0.02  
 custo_escritura_registro = v_imovel_venda * 0.018  
 v_iptu_ano = valor_venal_exato * 0.01  
@@ -140,10 +135,10 @@ with res_col2:
 
 veredit_text = ""
 if patr_final_comprar > patr_final_alugar:
-    veredit_text = f"COMPRAR o imóvel físico é matematicamente mais vantajoso por uma diferença de R$ {patr_final_comprar - patr_final_alugar:,.2f}."
+    veredit_text = f"COMPRAR o imóvel físico é mais vantajoso por R$ {patr_final_comprar - patr_final_alugar:,.2f}."
     st.success(f"🌟 VEREDITO FINANCEIRO: {veredit_text}")
 else:
-    veredit_text = f"ALUGAR E INVESTIR o capital é matematicamente mais vantajoso por uma diferença de R$ {patr_final_alugar - patr_final_comprar:,.2f}."
+    veredit_text = f"ALUGAR E INVESTIR o capital é mais vantajoso por R$ {patr_final_alugar - patr_final_comprar:,.2f}."
     st.info(f"🌟 VEREDITO FINANCEIRO: {veredit_text}")
 
 # --- 📈 GRÁFICO INTERATIVO ---
@@ -158,39 +153,33 @@ ax.legend()
 ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: format(int(x), ',')))
 st.pyplot(fig)
 
-# --- 📝 TEXTO DO PARECER ---
-texto_relatorio = f"""📊 PARECER TÉCNICO IMOBILIÁRIO - {nome_imovel.upper()}
+# --- 📝 TEXTO DO PARECER CONCISO PARA CELULAR ---
+texto_relatorio = f"""📊 RELATÓRIO IMOBILIÁRIO - {nome_imovel.upper()}
+Prazo: {periodo_simulacao_meses} meses.
 
-Análise de Cenários Financeiros para o prazo de {periodo_simulacao_meses} meses.
+🏡 COMPRA À VISTA:
+- Preço Final: R$ {v_imovel_venda:,.2f}
+- Taxas (ITBI/Cartório): R$ {total_taxas_compra:,.2f}
+👉 Total Gasto: R$ {custo_total_para_adquirir:,.2f}
 
-1️⃣ DADOS DA COMPRA:
-- Imóvel Identificado: {nome_imovel}
-- Preço Comercial do Imóvel: R$ {v_imovel_anuncio:,.2f}
-- Desconto Aplicado à Vista: {desconto_a_vista:.2f}%
-- Preço Final de Venda: R$ {v_imovel_venda:,.2f}
-- Imposto ITBI (2%): R$ {custo_itbi:,.2f}
-- Custos Cartorários (Escritura/Registro): R$ {custo_escritura_registro:,.2f}
-👉 Custo Total para Aquisição à Vista: R$ {custo_total_para_adquirir:,.2f}
+📈 ALUGUEL ALTERNATIVO:
+- Aluguel Inicial: R$ {v_aluguel_mensal_inicial:,.2f}/mês
 
-2️⃣ DADOS DO ALUGUEL ALTERNATIVO:
-- Custo de Aluguel Inicial: R$ {v_aluguel_mensal_inicial:,.2f}/mês
-- Custos de Condomínio + IPTU: R$ {v_condominio_inicial + iptu_vigente:,.2f}/mês
+📊 PATRIMÔNIO FINAL:
+- Se Comprar: R$ {patr_final_comprar:,.2f}
+- Se Alugar: R$ {patr_final_alugar:,.2f}
 
-3️⃣ PROJEÇÃO PATRIMONIAL APÓS {periodo_simulacao_meses} MESES:
-- Patrimônio Acumulado se COMPRAR: R$ {patr_final_comprar:,.2f}
-- Patrimônio Acumulado se ALUGAR: R$ {patr_final_alugar:,.2f}
-
-🏆 VEREDITO FINAL:
-{veredit_text}
-
-Gerado via Simulador Imobiliário Master."""
+🏆 VEREDITO: {veredit_text}"""
 
 st.markdown("---")
 st.subheader("📲 Compartilhar Análise")
-st.text_area("Pré-visualização do texto:", texto_relatorio, height=200)
+st.text_area("Pré-visualização do texto:", texto_relatorio, height=180)
 
+# Encodificação limpa para links móveis
 texto_codificado = urllib.parse.quote(texto_relatorio)
-link_whatsapp = f"https://whatsapp.com{texto_codificado}"
+
+# 🚀 SOLUÇÃO DO BLOQUEIO: Links diretos curtos usando o protocolo 'wa.me'
+link_whatsapp = f"https://wa.me{texto_codificado}"
 link_email = f"mailto:?subject=Analise%20Imobiliaria%20-%20Bauru&body={texto_codificado}"
 
 share_col1, share_col2 = st.columns(2)
