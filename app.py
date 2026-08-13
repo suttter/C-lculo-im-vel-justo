@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import urllib.parse
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Simulador Imobiliário Bauru", layout="wide")
 
@@ -120,9 +120,9 @@ with ext_col3:
     st.metric("✍️ Cartórios (Est.)", f"R$ {custo_escritura_registro:,.2f}")
 
 if saldo_banco_pos_compra < 0:
-    st.error(f"⚠️ ALERTA DE CAPITAL: Seu saldo de R$ {dinheiro_total_guardado:,.2f} não cobre as taxas! Faltam R$ {abs(saldo_banco_pos_compra):,.2f}.")
+    st.error(f"⚠️ ALERTA DE CAPITAL: Seu saldo não cobre as taxas! Faltam R$ {abs(saldo_banco_pos_compra):,.2f}.")
 else:
-    st.success(f"✅ SALDO SUFICIENTE: Sobrarão R$ {saldo_banco_pos_compra:,.2f} de reserva de emergência.")
+    st.success(f"✅ SALDO SUFICIENTE: Sobrarão R$ {saldo_banco_pos_compra:,.2f} de reserva.")
 
 # --- 📊 EXIBIÇÃO DO VEREDITO ---
 st.markdown("---")
@@ -153,7 +153,7 @@ ax.legend()
 ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: format(int(x), ',')))
 st.pyplot(fig)
 
-# --- 📝 TEXTO DO PARECER CONCISO PARA CELULAR ---
+# --- 📝 TEXTO DO PARECER CONCISO ---
 texto_relatorio = f"""📊 RELATÓRIO IMOBILIÁRIO - {nome_imovel.upper()}
 Prazo: {periodo_simulacao_meses} meses.
 
@@ -175,15 +175,31 @@ st.markdown("---")
 st.subheader("📲 Compartilhar Análise")
 st.text_area("Pré-visualização do texto:", texto_relatorio, height=180)
 
-# Encodificação limpa para links móveis
-texto_codificado = urllib.parse.quote(texto_relatorio)
+# Escapa quebras de linha para o JavaScript não quebrar
+texto_js = texto_relatorio.replace("\n", "\\n").replace("'", "\\'")
 
-# 🚀 SOLUÇÃO DO BLOQUEIO: Links diretos curtos usando o protocolo 'wa.me'
-link_whatsapp = f"https://wa.me{texto_codificado}"
-link_email = f"mailto:?subject=Analise%20Imobiliaria%20-%20Bauru&body={texto_codificado}"
+# 🚀 BOTÃO SUPREMO DE COMPARTILHAMENTO NATIVO (Abre o menu oficial de apps do celular)
+componentes_html = f"""
+<script>
+function compartilhar_celular() {{
+    if (navigator.share) {{
+        navigator.share({{
+            title: 'Análise Imobiliária',
+            text: '{texto_js}'
+        }}).then(() => {{
+            console.log('Compartilhado com sucesso!');
+        }}).catch((error) => {{
+            console.log('Erro ao compartilhar:', error);
+        }});
+    }} else {{
+        alert('Seu navegador não suporta compartilhamento nativo. Use o botão de cópia acima.');
+    }}
+}}
+</script>
+<button onclick="compartilhar_celular()" style="width:100%; background-color:#007BFF; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer; font-family: sans-serif;">
+    📱 Compartilhar com WhatsApp ou Outros Apps
+</button>
+"""
 
-share_col1, share_col2 = st.columns(2)
-with share_col1:
-    st.link_button("🟢 Compartilhar via WhatsApp", link_whatsapp, use_container_width=True)
-with share_col2:
-    st.link_button("🔴 Compartilhar via E-mail", link_email, use_container_width=True)
+# Renderiza o botão nativo do sistema operacional na tela do Streamlit
+components.html(componentes_html, height=60)
