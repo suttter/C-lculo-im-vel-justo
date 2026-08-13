@@ -58,7 +58,6 @@ custo_escritura_registro = v_imovel_venda * 0.018
 v_iptu_ano = valor_venal_exato * 0.01  
 v_iptu_mes_inicial = v_iptu_ano / 12
 
-# 🎯 SOMAS E TOTAIS SOLICITADOS
 total_taxas_compra = custo_itbi + custo_escritura_registro
 custo_total_para_adquirir = v_imovel_venda + total_taxas_compra
 sobra_ou_falta_imediata = dinheiro_total_guardado - custo_total_para_adquirir
@@ -74,6 +73,17 @@ saldo_banco_alugar = dinheiro_total_guardado
 aluguel_vigente = v_aluguel_mensal_inicial
 condominio_vigente = v_condominio_inicial
 iptu_vigente = v_iptu_mes_inicial
+
+# Variáveis acumuladoras dos fatores internos da simulação de tempo
+acumulado_aluguel = 0.0
+acumulado_condominio_alugar = 0.0
+acumulado_iptu_alugar = 0.0
+
+acumulado_condominio_comprar = 0.0
+acumulado_iptu_comprar = 0.0
+acumulado_manutencao = 0.0
+acumulado_rendimento_sobra = 0.0
+acumulado_rendimento_alugar = 0.0
 
 for mes in range(0, periodo_simulacao_meses + 1):
     if mes == 0:
@@ -96,10 +106,20 @@ for mes in range(0, periodo_simulacao_meses + 1):
         
         rend_mensal_cdi_liq = (((1 + (selic_atual * cdi_performance))**(1/12)) - 1) * 0.85
         
+        if saldo_banco_pos_compra > 0:
+            acumulado_rendimento_sobra += (saldo_banco_pos_compra * rend_mensal_cdi_liq)
+        acumulado_rendimento_alugar += (saldo_banco_alugar * rend_mensal_cdi_liq)
+
+        acumulado_condominio_comprar += condominio_vigente
+        acumulado_iptu_comprar += iptu_vigente
+        acumulado_manutencao += custo_manutencao_mes
         custo_comprar_mes = condominio_vigente + iptu_vigente + custo_manutencao_mes
-        custo_alugar_mes = aluguel_vigente + condominio_vigente + iptu_vigente
-        
         saldo_banco_pos_compra = (saldo_banco_pos_compra * (1 + rend_mensal_cdi_liq)) - custo_comprar_mes
+        
+        acumulado_aluguel += aluguel_vigente
+        acumulado_condominio_alugar += condominio_vigente
+        acumulado_iptu_alugar += iptu_vigente
+        custo_alugar_mes = aluguel_vigente + condominio_vigente + iptu_vigente
         saldo_banco_alugar = (saldo_banco_alugar * (1 + rend_mensal_cdi_liq)) - custo_alugar_mes
 
     patrimonio_comprar_total = imovel_fisico + saldo_banco_pos_compra
@@ -109,32 +129,23 @@ df = pd.DataFrame(dados)
 patr_final_comprar = dados[-1]["COMPRAR"]
 patr_final_alugar = dados[-1]["ALUGAR"]
 
-# --- 🖥️ EXIBIÇÃO DO EXTRATO DETALHADO (REESTRUTURADO) ---
+# --- 🖥️ EXIBIÇÃO DO EXTRATO DETALHADO ---
 st.markdown("---")
 st.subheader("📋 Extrato de Gastos Reais da Compra (Bauru):")
 
-# 1. Demonstração de Custos Individuais
 st.markdown("### 🛒 1. Custos Individuais de Aquisição:")
 ext_col1, ext_col2, ext_col3 = st.columns(3)
-with ext_col1:
-    st.metric("💵 Preço do Imóvel (C/ Desconto)", f"R$ {v_imovel_venda:,.2f}")
-with ext_col2:
-    st.metric("🏛️ Imposto municipal ITBI (2%)", f"R$ {custo_itbi:,.2f}")
-with ext_col3:
-    st.metric("✍️ Custos Cartorários (Est.)", f"R$ {custo_escritura_registro:,.2f}")
+with ext_col1: st.metric("💵 Preço do Imóvel (C/ Desconto)", f"R$ {v_imovel_venda:,.2f}")
+with ext_col2: st.metric("🏛️ Imposto municipal ITBI (2%)", f"R$ {custo_itbi:,.2f}")
+with ext_col3: st.metric("✍️ Custos Cartorários (Est.)", f"R$ {custo_escritura_registro:,.2f}")
 
 st.markdown("---")
 
-# 2. Exibição Destacada da Soma Total
 st.markdown("### 🧮 2. Resumo e Soma Total:")
 tot_col1, tot_col2 = st.columns(2)
-with tot_col1:
-    st.metric("📊 SOMA TOTAL DE TAXAS OCULTAS", f"R$ {total_taxas_compra:,.2f}")
-with tot_col2:
-    # Destaca em negrito/grande o valor total real necessário
-    st.metric("💰 GASTO TOTAL REAL DA COMPRA", f"R$ {custo_total_para_adquirir:,.2f}", delta="- À Vista")
+with tot_col1: st.metric("📊 SOMA DAS TAXAS OCULTAS", f"R$ {total_taxas_compra:,.2f}")
+with tot_col2: st.metric("💰 GASTO TOTAL DA COMPRA", f"R$ {custo_total_para_adquirir:,.2f}")
 
-# 3. Alerta de Viabilidade de Saldo
 if sobra_ou_falta_imediata < 0:
     st.error(f"⚠️ ALERTA DE CAPITAL: Seu saldo de R$ {dinheiro_total_guardado:,.2f} NÃO cobre o gasto total necessário! Faltam R$ {abs(sobra_ou_falta_imediata):,.2f} para conseguir escriturar à vista.")
 else:
@@ -144,10 +155,8 @@ else:
 st.markdown("---")
 st.subheader("📊 Patrimônio Acumulado no Final do Prazo:")
 res_col1, res_col2 = st.columns(2)
-with res_col1:
-    st.metric("🏡 Cenário Comprar Imóvel", f"R$ {patr_final_comprar:,.2f}")
-with res_col2:
-    st.metric("📈 Cenário Alugar e Investir", f"R$ {patr_final_alugar:,.2f}")
+with res_col1: st.metric("🏡 Cenário Comprar Imóvel", f"R$ {patr_final_comprar:,.2f}")
+with res_col2: st.metric("📈 Cenário Alugar e Investir", f"R$ {patr_final_alugar:,.2f}")
 
 veredit_text = ""
 if patr_final_comprar > patr_final_alugar:
@@ -156,6 +165,27 @@ if patr_final_comprar > patr_final_alugar:
 else:
     veredit_text = f"ALUGAR E INVESTIR o capital é mais vantajoso por R$ {patr_final_alugar - patr_final_comprar:,.2f}."
     st.info(f"🌟 VEREDITO FINANCEIRO: {veredit_text}")
+
+st.markdown("### 🔍 Abertura Detalhada das Contas do Período:")
+tab_compra, tab_aluguel = st.columns(2)
+
+with tab_compra:
+    st.markdown("#### 🏡 Detalhamento do Cenário Comprar:")
+    st.write(f"🔹 **(+) Valor do Imóvel Físico Atualizado (Valorização):** R$ {imovel_fisico:,.2f}")
+    st.write(f"🔹 **(+) Troco Inicial + Rendimento do Banco:** R$ {max(0.0, dinheiro_total_guardado - custo_total_para_adquirir) + acumulado_rendimento_sobra:,.2f}")
+    st.write(f"📉 **(-) Total Gasto com Condomínio:** R$ {acumulado_condominio_comprar:,.2f}")
+    st.write(f"📉 **(-) Total Gasto com IPTU:** R$ {acumulado_iptu_comprar:,.2f}")
+    st.write(f"📉 **(-) Total Gasto com Manutenção Física:** R$ {acumulado_manutencao:,.2f}")
+    st.markdown(f"👉 **PATRIMÔNIO LÍQUIDO FINAL:** **R$ {patr_final_comprar:,.2f}**")
+
+with tab_aluguel:
+    st.markdown("#### 📈 Detalhamento do Cenário Alugar:")
+    st.write(f"🔹 **(+) Capital Inicial Investido:** R$ {dinheiro_total_guardado:,.2f}")
+    st.write(f"🔹 **(+) Total de Juros Ganhos no Banco:** R$ {acumulado_rendimento_alugar:,.2f}")
+    st.write(f"📉 **(-) Total Gasto com Aluguel:** R$ {acumulado_aluguel:,.2f}")
+    st.write(f"📉 **(-) Total Gasto com Condomínio:** R$ {acumulado_condominio_alugar:,.2f}")
+    st.write(f"📉 **(-) Total Gasto com IPTU:** R$ {acumulado_iptu_alugar:,.2f}")
+    st.markdown(f"👉 **PATRIMÔNIO LÍQUIDO FINAL:** **R$ {patr_final_alugar:,.2f}**")
 
 # --- 📈 GRÁFICO INTERATIVO ---
 plt.close('all')
@@ -179,40 +209,5 @@ Prazo: {periodo_simulacao_meses} meses.
 👉 GASTO TOTAL REAL DA COMPRA: R$ {custo_total_para_adquirir:,.2f}
 
 📈 ALUGUEL ALTERNATIVO:
-- Aluguel Inicial: R$ {v_aluguel_mensal_inicial:,.2f}/mês
-
-📊 PATRIMÔNIO FINAL:
-- Se Comprar: R$ {patr_final_comprar:,.2f}
-- Se Alugar: R$ {patr_final_alugar:,.2f}
-
-🏆 VEREDITO: {veredit_text}"""
-
-st.markdown("---")
-st.subheader("📲 Compartilhar Análise")
-st.text_area("Pré-visualização do texto:", texto_relatorio, height=180)
-
-texto_js = texto_relatorio.replace("\n", "\\n").replace("'", "\\'")
-
-componentes_html = f"""
-<script>
-function compartilhar_celular() {{
-    if (navigator.share) {{
-        navigator.share({{
-            title: 'Análise Imobiliária',
-            text: '{texto_js}'
-        }}).then(() => {{
-            console.log('Compartilhado com sucesso!');
-        }}).catch((error) => {{
-            console.log('Erro ao compartilhar:', error);
-        }});
-    }} else {{
-        alert('Seu navegador não suporta compartilhamento nativo. Use o botão de cópia acima.');
-    }}
-}}
-</script>
-<button onclick="compartilhar_celular()" style="width:100%; background-color:#007BFF; color:white; border:none; padding:14px; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer; font-family: sans-serif;">
-    📱 Compartilhar com WhatsApp ou Outros Apps
-</button>
-"""
-
-components.html(componentes_html, height=60)
+- Aluguel acumulado gasto no prazo: R$ {acumulado_aluguel:,.2f}
+Taxas acumuladas pagas no aluguel (Condomínio/IPTU): R$ {acumulado_condominio_alugar + acumulado_iptu_alugar:,.2f}📊 PATRIMÔNIO FINAL:Se Comprar: R$ {patr_final_comprar:,.2f}Se Alugar: R$ {patr_final_alugar:,.2f}🏆 VEREDITO: {veredit_text}"""st.markdown("---")st.subheader("📲 Compartilhar Análise")st.text_area("Pré-visualização do texto:", texto_relatorio, height=180)texto_js = texto_relatorio.replace("\n", "\n").replace("'", "\'")componentes_html = f"""function compartilhar_celular() {{if (navigator.share) {{navigator.share({{title: 'Análise Imobiliária',text: '{texto_js}'}}).then(() => {{console.log('Compartilhado com sucesso!');}}).catch((error) => {{console.log('Erro ao compartilhar:', error);}});}} else {{alert('Seu navegador não suporta compartilhamento nativo. Use o botão de cópia acima.');}}}}📱 Compartilhar com WhatsApp ou Outros Apps"""components.html(componentes_html, height=60)
