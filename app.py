@@ -8,6 +8,12 @@ st.set_page_config(page_title="Simulador Imobiliário Bauru", layout="wide")
 st.title("🏆 Simulador Imobiliário Master - Bauru")
 st.markdown("Altere os dados no painel abaixo para ver o resultado, impostos e o gráfico mudarem em tempo real no seu celular.")
 
+# --- 🚀 GERENCIAMENTO DE ESTADO PARA OS BOTÕES ---
+if "selic_val" not in st.session_state:
+    st.session_state.selic_val = 14.00
+if "cdi_val" not in st.session_state:
+    st.session_state.cdi_val = 105.0
+
 # --- 📱 PAINEL INTERATIVO DE ENTRADA DE DADOS ---
 st.subheader("📍 Identificação do Imóvel")
 nome_imovel = st.text_input("Nome do Condomínio, Prédio ou Rua do Imóvel", value="Apartamento Térreo - Bauru")
@@ -28,20 +34,21 @@ st.subheader("📈 Condições de Aluguel")
 v_aluguel_mensal_inicial = st.number_input("Aluguel mensal inicial sugerido (R$)", value=1000, step=50)
 
 st.subheader("🔮 Cenário Econômico do Brasil")
-if st.button("📊 Preencher Automaticamente com os Dados de Hoje (Agosto/2026)"):
-    st.session_state.taxa_selic_slider = 14.00
-    st.session_state.cdi_slider = 105.0
 
-if 'taxa_selic_slider' not in st.session_state: st.session_state.taxa_selic_slider = 14.00
-if 'cdi_slider' not in st.session_state: st.session_state.cdi_slider = 105.0
+# Botão de atalho prático que altera o estado interno na hora
+if st.button("📊 Preencher Automaticamente com os Dados de Hoje (Agosto/2026)"):
+    st.session_state.selic_val = 14.00
+    st.session_state.cdi_val = 105.0
+    st.rerun()
 
 col_eco1, col_eco2 = st.columns(2)
 with col_eco1:
     periodo_simulacao_meses = st.slider("Prazo de análise da simulação (Meses)", 1, 120, 60, 1)
     tendencia_da_selic = st.selectbox("Tendência futura da Taxa Selic", ["Queda Gradual", "Alta Gradual", "Estável"])
 with col_eco2:
-    taxa_selic_hoje = st.slider("Taxa Selic atual do país (% a.a.)", 2.0, 20.0, st.session_state.taxa_selic_slider, 0.25, key="selic_real") / 100
-    cdi_performance = st.slider("Rentabilidade da sua Renda Fixa (% do CDI)", 90.0, 120.0, st.session_state.cdi_slider, 1.0, key="cdi_real") / 100
+    # 🎯 ALTERADO: Campos de digitação direta para evitar os travamentos de memória do slider
+    taxa_selic_hoje = st.number_input("Taxa Selic atual do país (% ao ano)", value=st.session_state.selic_val, step=0.25) / 100
+    cdi_performance = st.number_input("Rentabilidade da sua Renda Fixa (% do CDI)", value=st.session_state.cdi_val, step=1.0) / 100
 
 val_imovel_ano = 0.06 
 inflacao_ano = 0.04   
@@ -182,11 +189,8 @@ st.text_area("Pré-visualização do texto:", texto_relatorio, height=200)
 
 texto_codificado = urllib.parse.quote(texto_relatorio)
 link_whatsapp = f"https://whatsapp.com{texto_codificado}"
+link_email = f"mailto:?subject=Analise%20Imobiliaria%20-%20Bauru&body={texto_codificado}"
 
-assunto_email = urllib.parse.quote(f"Análise Imobiliária - {nome_imovel}")
-link_email = f"mailto:?subject={assunto_email}&body={texto_codificado}"
-
-# 🚀 CORREÇÃO DO ERRO: Uso dos botões nativos do Streamlit com largura total
 share_col1, share_col2 = st.columns(2)
 with share_col1:
     st.link_button("🟢 Compartilhar via WhatsApp", link_whatsapp, use_container_width=True)
