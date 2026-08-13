@@ -58,8 +58,10 @@ custo_escritura_registro = v_imovel_venda * 0.018
 v_iptu_ano = valor_venal_exato * 0.01  
 v_iptu_mes_inicial = v_iptu_ano / 12
 
+# 🎯 SOMAS E TOTAIS SOLICITADOS
 total_taxas_compra = custo_itbi + custo_escritura_registro
 custo_total_para_adquirir = v_imovel_venda + total_taxas_compra
+sobra_ou_falta_imediata = dinheiro_total_guardado - custo_total_para_adquirir
 
 val_mensal_imovel = (1 + val_imovel_ano)**(1/12) - 1
 inflacao_mensal = (1 + inflacao_ano)**(1/12) - 1
@@ -107,22 +109,36 @@ df = pd.DataFrame(dados)
 patr_final_comprar = dados[-1]["COMPRAR"]
 patr_final_alugar = dados[-1]["ALUGAR"]
 
-# --- 🖥️ EXIBIÇÃO DO EXTRATO ---
+# --- 🖥️ EXIBIÇÃO DO EXTRATO DETALHADO (REESTRUTURADO) ---
 st.markdown("---")
 st.subheader("📋 Extrato de Gastos Reais da Compra (Bauru):")
 
+# 1. Demonstração de Custos Individuais
+st.markdown("### 🛒 1. Custos Individuais de Aquisição:")
 ext_col1, ext_col2, ext_col3 = st.columns(3)
 with ext_col1:
-    st.metric("💵 Preço com Desconto", f"R$ {v_imovel_venda:,.2f}")
+    st.metric("💵 Preço do Imóvel (C/ Desconto)", f"R$ {v_imovel_venda:,.2f}")
 with ext_col2:
-    st.metric("🏛️ Imposto ITBI (2%)", f"R$ {custo_itbi:,.2f}")
+    st.metric("🏛️ Imposto municipal ITBI (2%)", f"R$ {custo_itbi:,.2f}")
 with ext_col3:
-    st.metric("✍️ Cartórios (Est.)", f"R$ {custo_escritura_registro:,.2f}")
+    st.metric("✍️ Custos Cartorários (Est.)", f"R$ {custo_escritura_registro:,.2f}")
 
-if saldo_banco_pos_compra < 0:
-    st.error(f"⚠️ ALERTA DE CAPITAL: Seu saldo não cobre as taxas! Faltam R$ {abs(saldo_banco_pos_compra):,.2f}.")
+st.markdown("---")
+
+# 2. Exibição Destacada da Soma Total
+st.markdown("### 🧮 2. Resumo e Soma Total:")
+tot_col1, tot_col2 = st.columns(2)
+with tot_col1:
+    st.metric("📊 SOMA TOTAL DE TAXAS OCULTAS", f"R$ {total_taxas_compra:,.2f}")
+with tot_col2:
+    # Destaca em negrito/grande o valor total real necessário
+    st.metric("💰 GASTO TOTAL REAL DA COMPRA", f"R$ {custo_total_para_adquirir:,.2f}", delta="- À Vista")
+
+# 3. Alerta de Viabilidade de Saldo
+if sobra_ou_falta_imediata < 0:
+    st.error(f"⚠️ ALERTA DE CAPITAL: Seu saldo de R$ {dinheiro_total_guardado:,.2f} NÃO cobre o gasto total necessário! Faltam R$ {abs(sobra_ou_falta_imediata):,.2f} para conseguir escriturar à vista.")
 else:
-    st.success(f"✅ SALDO SUFICIENTE: Sobrarão R$ {saldo_banco_pos_compra:,.2f} de reserva.")
+    st.success(f"✅ SALDO SUFICIENTE: Seu capital cobre o gasto total! Após a compra e o pagamento das taxas, te sobrarão R$ {sobra_ou_falta_imediata:,.2f} livres como reserva de emergência imediata.")
 
 # --- 📊 EXIBIÇÃO DO VEREDITO ---
 st.markdown("---")
@@ -158,9 +174,9 @@ texto_relatorio = f"""📊 RELATÓRIO IMOBILIÁRIO - {nome_imovel.upper()}
 Prazo: {periodo_simulacao_meses} meses.
 
 🏡 COMPRA À VISTA:
-- Preço Final: R$ {v_imovel_venda:,.2f}
-- Taxas (ITBI/Cartório): R$ {total_taxas_compra:,.2f}
-👉 Total Gasto: R$ {custo_total_para_adquirir:,.2f}
+- Preço do Imóvel: R$ {v_imovel_venda:,.2f}
+- Soma de Taxas (ITBI + Cartórios): R$ {total_taxas_compra:,.2f}
+👉 GASTO TOTAL REAL DA COMPRA: R$ {custo_total_para_adquirir:,.2f}
 
 📈 ALUGUEL ALTERNATIVO:
 - Aluguel Inicial: R$ {v_aluguel_mensal_inicial:,.2f}/mês
@@ -175,10 +191,8 @@ st.markdown("---")
 st.subheader("📲 Compartilhar Análise")
 st.text_area("Pré-visualização do texto:", texto_relatorio, height=180)
 
-# Escapa quebras de linha para o JavaScript não quebrar
 texto_js = texto_relatorio.replace("\n", "\\n").replace("'", "\\'")
 
-# 🚀 BOTÃO SUPREMO DE COMPARTILHAMENTO NATIVO (Abre o menu oficial de apps do celular)
 componentes_html = f"""
 <script>
 function compartilhar_celular() {{
@@ -201,5 +215,4 @@ function compartilhar_celular() {{
 </button>
 """
 
-# Renderiza o botão nativo do sistema operacional na tela do Streamlit
 components.html(componentes_html, height=60)
