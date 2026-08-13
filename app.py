@@ -8,10 +8,15 @@ st.set_page_config(page_title="Simulador Imobiliário Bauru", layout="wide")
 st.title("🏆 Simulador Imobiliário Master - Bauru")
 st.markdown("Altere os dados no painel abaixo para ver o resultado, impostos e o gráfico mudarem em tempo real no seu celular.")
 
-# --- 🚀 GERENCIAMENTO DE ESTADO PARA OS BOTÕES ---
+# --- 🚀 GERENCIAMENTO DE ESTADO PARA OS CAMPOS (TRAVA DE CHAVE) ---
 if "selic_val" not in st.session_state:
     st.session_state.selic_val = 14.00
 if "cdi_val" not in st.session_state:
+    st.session_state.cdi_val = 105.0
+
+# Função executada ao clicar no botão para atualizar a memória do app
+def preencher_dados_hoje():
+    st.session_state.selic_val = 14.00
     st.session_state.cdi_val = 105.0
 
 # --- 📱 PAINEL INTERATIVO DE ENTRADA DE DADOS ---
@@ -35,20 +40,17 @@ v_aluguel_mensal_inicial = st.number_input("Aluguel mensal inicial sugerido (R$)
 
 st.subheader("🔮 Cenário Econômico do Brasil")
 
-# Botão de atalho prático que altera o estado interno na hora
-if st.button("📊 Preencher Automaticamente com os Dados de Hoje (Agosto/2026)"):
-    st.session_state.selic_val = 14.00
-    st.session_state.cdi_val = 105.0
-    st.rerun()
+# Botão prático que limpa os campos e injeta os dados reais de 2026
+st.button("📊 Preencher Automaticamente com os Dados de Hoje (Agosto/2026)", on_click=preencher_dados_hoje)
 
 col_eco1, col_eco2 = st.columns(2)
 with col_eco1:
     periodo_simulacao_meses = st.slider("Prazo de análise da simulação (Meses)", 1, 120, 60, 1)
     tendencia_da_selic = st.selectbox("Tendência futura da Taxa Selic", ["Queda Gradual", "Alta Gradual", "Estável"])
 with col_eco2:
-    # 🎯 ALTERADO: Campos de digitação direta para evitar os travamentos de memória do slider
-    taxa_selic_hoje = st.number_input("Taxa Selic atual do país (% ao ano)", value=st.session_state.selic_val, step=0.25) / 100
-    cdi_performance = st.number_input("Rentabilidade da sua Renda Fixa (% do CDI)", value=st.session_state.cdi_val, step=1.0) / 100
+    # 🎯 CORREÇÃO: Vinculação direta do valor com a chave de memória (key) do session_state
+    taxa_selic_hoje = st.number_input("Taxa Selic atual do país (% ao ano)", step=0.25, key="selic_val") / 100
+    cdi_performance = st.number_input("Rentabilidade da sua Renda Fixa (% do CDI)", step=1.0, key="cdi_val") / 100
 
 val_imovel_ano = 0.06 
 inflacao_ano = 0.04   
