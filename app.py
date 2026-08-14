@@ -47,7 +47,7 @@ sobra_ou_falta_imediata = dinheiro_total_guardado - custo_total_para_adquirir
 
 dados, saldo_banco_pos_compra, imovel_fisico, saldo_banco_alugar = [], dinheiro_total_guardado - custo_total_para_adquirir, v_imovel_venda, dinheiro_total_guardado
 aluguel_vigente, condominio_vigente, iptu_vigente = v_aluguel_mensal_inicial, v_condominio_inicial, v_iptu_mes_inicial
-ac_aluguel, ac_cond_aluguel, ac_iptu_aluguel, ac_cond_compra, ac_iptu_compra, ac_manutencao, ac_juros_sobra, ac_juros_aluguel = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+ac_aluguel, ac_cond_aluguel, ac_iptu_aluguel, ac_cond_compra, ac_iptu_compra, ac_juros_sobra, ac_juros_aluguel = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
 for mes in range(0, periodo_simulacao_meses + 1):
     if mes == 0: selic_atual = taxa_selic_hoje
@@ -60,14 +60,12 @@ for mes in range(0, periodo_simulacao_meses + 1):
             condominio_vigente *= 1.04
             iptu_vigente *= 1.04
         imovel_fisico *= (1 + ((1 + 0.06)**(1/12) - 1))
-        custo_manutencao_mes = (imovel_fisico * 0.005) / 12
         rend_mensal_cdi_liq = (((1 + (selic_atual * cdi_performance))**(1/12)) - 1) * 0.85
         if saldo_banco_pos_compra > 0: ac_juros_sobra += (saldo_banco_pos_compra * rend_mensal_cdi_liq)
         ac_juros_aluguel += (saldo_banco_alugar * rend_mensal_cdi_liq)
         ac_cond_compra += condominio_vigente
         ac_iptu_compra += iptu_vigente
-        ac_manutencao += custo_manutencao_mes
-        saldo_banco_pos_compra = (saldo_banco_pos_compra * (1 + rend_mensal_cdi_liq)) - (condominio_vigente + iptu_vigente + custo_manutencao_mes)
+        saldo_banco_pos_compra = (saldo_banco_pos_compra * (1 + rend_mensal_cdi_liq)) - (condominio_vigente + iptu_vigente)
         ac_aluguel += aluguel_vigente
         ac_cond_aluguel += condominio_vigente
         ac_iptu_aluguel += iptu_vigente
@@ -113,7 +111,6 @@ with tab_compra:
     st.write(f"🔹 **(+) Troco Inicial + Juros do Banco:** R$ {max(0.0, sobra_ou_falta_imediata) + ac_juros_sobra:,.2f}")
     st.write(f"📉 **(-) Total Gasto com Condomínio:** R$ {ac_cond_compra:,.2f}")
     st.write(f"📉 **(-) Total Gasto com IPTU:** R$ {ac_iptu_compra:,.2f}")
-    st.write(f"📉 **(-) Total Gasto com Manutenção Física:** R$ {ac_manutencao:,.2f}")
 with tab_aluguel:
     st.markdown("#### 📈 Detalhamento do Cenário Alugar:")
     st.write(f"🔹 **(+) Capital Inicial Investido:** R$ {dinheiro_total_guardado:,.2f}")
